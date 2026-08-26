@@ -44,14 +44,14 @@ class HomeController extends Controller
 
     public function userBookStore()
     {
-        $data = Hoteldetail::all()->where('status', '=', 0);
+        $data = Hoteldetail::where('status', 0)->get();
         return view('booknow', compact('data'));
     }
 
     public function userBookView()
     {
         $id = Auth::id();
-        $data = Booking::all()->where('user_id', '=', $id);
+        $data = Booking::where('user_id', $id)->get();
         return view('viewbooking', compact('data'));
     }
 
@@ -91,7 +91,7 @@ class HomeController extends Controller
 
     public function userApproveByStaff()
     {
-        $data =  Booking::all()->where('status', '=', 0);
+        $data = Booking::where('status', 0)->get();
         return view('staff.userapprovebystaff', compact('data'));
     }
 
@@ -120,7 +120,7 @@ class HomeController extends Controller
 
     public function userCheckOut()
     {
-        $data =  Booking::all()->where('status', '=', 1);
+        $data = Booking::where('status', 1)->get();
         return view('staff.approveduserbystaff', compact('data'));
     }
 

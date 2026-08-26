@@ -151,7 +151,7 @@ class AdminController extends Controller
 
     public function staffList()
     {
-        $data =  User::all()->where('is_admin', '=', 2);
+        $data = User::where('is_admin', 2)->get();
         return view('admin.stafflist', compact('data'));
     }
 
