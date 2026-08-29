@@ -1,74 +1,105 @@
-# For more information: https://laravel.com/docs/sail
-version: '3'
+# Local stack for the Hotel Management app.
+# The app image is built from the repo's own Dockerfile (nginx + php-fpm).
+#
+#   docker compose up --build      -> http://localhost:8080
+#
+# Note: the app image bakes in code and vendor/ — there is no bind mount of the
+# source, so rebuild (`docker compose up --build`) after changing PHP code.
+
 services:
-    laravel.test:
+    app:
         build:
-            context: ./vendor/laravel/sail/runtimes/8.0
+            context: .
             dockerfile: Dockerfile
             args:
-                WWWGROUP: '${WWWGROUP}'
-        image: sail-8.0/app
+                PHP_VERSION: '${PHP_VERSION:-8.4}'
+        image: hotel-management:local
+        restart: unless-stopped
         ports:
-            - '${APP_PORT:-80}:80'
+            - '${APP_PORT:-8080}:80'
+        env_file:
+            - .env
         environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
+            # These win over .env, so the container always talks to the
+            # service containers below rather than to a host/sqlite database.
+            DB_CONNECTION: mysql
+            DB_HOST: mysql
+            DB_PORT: 3306
+            DB_DATABASE: '${MYSQL_DATABASE:-hotel_management}'
+            DB_USERNAME: '${MYSQL_USER:-hotel}'
+            DB_PASSWORD: '${MYSQL_PASSWORD:-secret}'
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
+            REDIS_PASSWORD: 'null'
+            MAIL_HOST: mailhog
+            MAIL_PORT: 1025
+            # Run `php artisan migrate --force` on start. Set to "false" to skip.
+            RUN_MIGRATIONS: '${RUN_MIGRATIONS:-true}'
         volumes:
-            - '.:/var/www/html'
-        networks:
-            - sail
+            # Uploads land in public/images (AdminController) — keep them on the host.
+            - './public/images:/var/www/html/public/images'
+            - 'app-storage:/var/www/html/storage'
         depends_on:
-            - mysql
-            - redis
-            # - selenium
-    # selenium:
-    #     image: 'selenium/standalone-chrome'
-    #     volumes:
-    #         - '/dev/shm:/dev/shm'
-    #     networks:
-    #         - sail
-    #     depends_on:
-    #         - laravel.test
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        networks:
+            - hotel
+
     mysql:
-        image: 'mysql:8.0'
+        image: 'mysql:8.4'
+        restart: unless-stopped
         ports:
-            - '${DB_PORT}:3306'
+            - '${FORWARD_DB_PORT:-3306}:3306'
         environment:
-            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
-            MYSQL_DATABASE: '${DB_DATABASE}'
-            MYSQL_USER: '${DB_USERNAME}'
-            MYSQL_PASSWORD: '${DB_PASSWORD}'
-            MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+            MYSQL_ROOT_PASSWORD: '${MYSQL_ROOT_PASSWORD:-secret}'
+            MYSQL_DATABASE: '${MYSQL_DATABASE:-hotel_management}'
+            MYSQL_USER: '${MYSQL_USER:-hotel}'
+            MYSQL_PASSWORD: '${MYSQL_PASSWORD:-secret}'
         volumes:
-            - 'sailmysql:/var/lib/mysql'
+            - 'mysql-data:/var/lib/mysql'
+        healthcheck:
+            test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-p${MYSQL_ROOT_PASSWORD:-secret}']
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
         networks:
-            - sail
+            - hotel
+
     redis:
-        image: 'redis:alpine'
+        image: 'redis:7-alpine'
+        restart: unless-stopped
         ports:
-            - '${REDIS_PORT}:6379'
+            - '${FORWARD_REDIS_PORT:-6379}:6379'
         volumes:
-            - 'sailredis:/data'
+            - 'redis-data:/data'
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 10s
+            timeout: 5s
+            retries: 5
         networks:
-            - sail
-    # memcached:
-    #     image: 'memcached:alpine'
-    #     ports:
-    #         - '11211:11211'
-    #     networks:
-    #         - sail
+            - hotel
+
     mailhog:
         image: 'mailhog/mailhog:latest'
+        restart: unless-stopped
         ports:
-            - 1025:1025
-            - 8025:8025
+            - '${FORWARD_MAILHOG_PORT:-1025}:1025'
+            - '${FORWARD_MAILHOG_DASHBOARD_PORT:-8025}:8025'
         networks:
-            - sail
+            - hotel
+
 networks:
-    sail:
+    hotel:
         driver: bridge
+
 volumes:
-    sailmysql:
+    mysql-data:
         driver: local
-    sailredis:
+    redis-data:
+        driver: local
+    app-storage:
         driver: local
