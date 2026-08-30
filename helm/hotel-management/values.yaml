@@ -1,0 +1,192 @@
+# Default values for hotel-management.
+
+replicaCount: 1
+
+image:
+  repository: hotel-management
+  # Defaults to .Chart.AppVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# nginx inside the image listens on port 80 ("listen 80 default_server" in the
+# Dockerfile's baked nginx.conf). The Dockerfile's `EXPOSE 8800` is metadata
+# only and does NOT change the listening port, so do not set this to 8800
+# unless you also change the nginx config in the Dockerfile.
+containerPort: 80
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  hosts:
+    - host: hotel.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: hotel-management-tls
+    #   hosts:
+    #     - hotel.example.com
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# The image's supervisord/nginx master process starts as root and drops
+# workers to www-data, so do not force runAsNonRoot without reworking the image.
+podSecurityContext: {}
+securityContext: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# /healthz is served by nginx directly (no PHP), so probes stay green even if
+# php-fpm is briefly saturated. Swap the path to "/" if you want probes to
+# exercise the PHP stack too.
+probes:
+  liveness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 20
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startup:
+    enabled: true
+    path: /healthz
+    periodSeconds: 5
+    timeoutSeconds: 3
+    # Entrypoint runs config/route/view caching before nginx starts.
+    failureThreshold: 30
+
+# Sessions and cache default to the "file" driver and the image has no PHP
+# redis client, so multiple replicas will not share sessions. Keep
+# replicaCount at 1 (and autoscaling off) unless you add a shared session
+# store or enable sticky sessions at the ingress.
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: ""
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+app:
+  name: Hotel Management
+  env: production
+  debug: false
+  # Used for generated links (password resets, redirects). Host header
+  # validation is disabled in app/Http/Middleware/TrustHosts.php, so this does
+  # not gate incoming requests.
+  url: http://hotel.example.com
+  # Laravel APP_KEY ("base64:..."). If left empty the chart generates one on
+  # first install and reuses it on upgrades by reading back its own Secret.
+  # Set it explicitly (or use existingSecret) for GitOps / `helm template`.
+  key: ""
+  logChannel: stderr
+  logLevel: warning
+  cacheDriver: file
+  sessionDriver: file
+  sessionLifetime: 120
+  queueConnection: sync
+  broadcastDriver: log
+
+database:
+  connection: mysql
+  host: mysql
+  port: 3306
+  name: hotel_management
+  username: hotel
+  password: ""
+  # When set, DB_PASSWORD is read from this Secret instead of the chart's.
+  existingSecret: ""
+  existingSecretPasswordKey: DB_PASSWORD
+
+mail:
+  mailer: smtp
+  host: mailhog
+  port: 1025
+  username: ""
+  password: ""
+  encryption: ""
+  fromAddress: no-reply@example.com
+  fromName: ""
+
+# Runs `php artisan migrate --force` as a post-install/post-upgrade Helm hook,
+# so it happens once per release instead of once per pod. The Deployment always
+# sets RUN_MIGRATIONS=false to keep the image entrypoint from racing replicas.
+migrations:
+  enabled: true
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  resources: {}
+
+persistence:
+  # AdminController writes uploads to public/images. Without a volume they live
+  # in the container filesystem: lost on restart and not shared across replicas.
+  # The image also ships 56 seed images in that directory — seedFromImage
+  # copies them into the volume on first use so they are not hidden by the mount.
+  uploads:
+    enabled: false
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteMany
+    size: 5Gi
+    seedFromImage: true
+  # storage/ holds file sessions, the framework cache and compiled views.
+  # Leave disabled for ephemeral per-pod state (logs already go to stderr).
+  storage:
+    enabled: false
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 2Gi
+
+# Extra environment variables, e.g.
+#   - name: AWS_BUCKET
+#     value: my-bucket
+extraEnv: []
+
+# Extra envFrom sources, e.g.
+#   - secretRef:
+#       name: pusher-credentials
+extraEnvFrom: []
+
+extraVolumes: []
+extraVolumeMounts: []

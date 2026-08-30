@@ -1,0 +1,18 @@
+apiVersion: v2
+name: hotel-management
+description: Laravel hotel management app — single container running nginx + php-fpm under supervisord
+type: application
+
+# Chart version — bump on every chart change.
+version: 0.1.0
+
+# Default container image tag (overridable with image.tag).
+appVersion: "1.0.0"
+
+keywords:
+  - laravel
+  - php
+  - hotel-management
+home: https://github.com/prathinsajith/Hotel-Management
+maintainers:
+  - name: Prathin Sajith

@@ -1,0 +1,35 @@
+{{- if and .Values.persistence.uploads.enabled (not .Values.persistence.uploads.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hotel-management.fullname" . }}-uploads
+  labels:
+    {{- include "hotel-management.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.uploads.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.uploads.size }}
+  {{- with .Values.persistence.uploads.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}
+---
+{{- if and .Values.persistence.storage.enabled (not .Values.persistence.storage.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hotel-management.fullname" . }}-storage
+  labels:
+    {{- include "hotel-management.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.storage.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.storage.size }}
+  {{- with .Values.persistence.storage.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

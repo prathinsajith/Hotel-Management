@@ -42,3 +42,6 @@ public/storage
 Dockerfile
 .dockerignore
 docker-compose.yml
+
+# Deployment manifests — not part of the runtime image
+helm

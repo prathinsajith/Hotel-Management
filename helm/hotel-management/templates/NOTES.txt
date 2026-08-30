@@ -1,0 +1,43 @@
+{{ .Chart.Name }} {{ .Chart.Version }} deployed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+Image: {{ include "hotel-management.image" . }}
+
+Reach the app:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else if eq .Values.service.type "ClusterIP" }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "hotel-management.fullname" . }} 8080:{{ .Values.service.port }}
+  then open http://127.0.0.1:8080
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} get svc {{ include "hotel-management.fullname" . }}
+{{- end }}
+
+{{ if .Values.migrations.enabled -}}
+Migrations run as a post-install/post-upgrade Job:
+  kubectl -n {{ .Release.Namespace }} logs job/{{ include "hotel-management.fullname" . }}-migrate
+{{- else -}}
+Migrations are DISABLED. Run them yourself:
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "hotel-management.fullname" . }} -- php artisan migrate --force
+{{- end }}
+
+{{ if not .Values.app.key }}
+WARNING: app.key was not set, so the chart generated an APP_KEY and stored it in
+the Secret {{ include "hotel-management.fullname" . }}. It is reused on upgrade,
+but `helm template`/`--dry-run` cannot read it back and will render a different
+key. Set app.key explicitly for GitOps. Rotating it invalidates all existing
+sessions and encrypted cookies.
+{{- end }}
+{{- if gt (int .Values.replicaCount) 1 }}
+
+WARNING: replicaCount is {{ .Values.replicaCount }} but SESSION_DRIVER is
+"{{ .Values.app.sessionDriver }}" and the image has no PHP redis client, so
+each pod keeps its own sessions. Users will be logged out at random unless the
+ingress does sticky sessions.
+{{- end }}
+{{- if and (not .Values.persistence.uploads.enabled) }}
+
+NOTE: persistence.uploads is disabled. Images uploaded through the admin UI are
+written to the container filesystem and are lost when a pod restarts.
+{{- end }}
