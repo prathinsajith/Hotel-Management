@@ -3,7 +3,7 @@
 replicaCount: 1
 
 image:
-  repository: hotel-management
+  repository: 417425907159.dkr.ecr.us-east-1.amazonaws.com/prathinsajith/hotel-management
   # Defaults to .Chart.AppVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent
@@ -126,13 +126,38 @@ app:
   queueConnection: sync
   broadcastDriver: log
 
+# MySQL database configuration
+mysql:
+  enabled: true
+  image:
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+
+  database: hotel_management
+  username: hotel
+  password: hotel_password
+
+  persistence:
+    enabled: false
+    size: 5Gi
+    storageClass: ""
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 database:
   connection: mysql
   host: mysql
   port: 3306
   name: hotel_management
   username: hotel
-  password: ""
+  password: hotel_password
   # When set, DB_PASSWORD is read from this Secret instead of the chart's.
   existingSecret: ""
   existingSecretPasswordKey: DB_PASSWORD
