@@ -44,7 +44,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- define "hotel-management.image" -}}
-{{- printf "%s:%s" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) }}
+{{- printf "%s:%v" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) }}
 {{- end }}
 
 {{/*
